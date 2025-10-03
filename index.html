@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Circle Quiz Master</title>
+<style>
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #00c6ff, #0072ff);
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.container {
+    background: #1e1e2f;
+    padding: 30px 40px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+    animation: fadeIn 0.8s ease;
+}
+
+h1 {
+    margin-bottom: 20px;
+    color: #00ffcc;
+}
+
+.button {
+    padding: 12px 25px;
+    font-size: 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #ff7f50;
+    color: #fff;
+    transition: all 0.3s ease;
+}
+.button:hover { 
+    background: #ff6347; 
+    transform: scale(1.05);
+}
+
+.question-card {
+    background: #2c2c4c;
+    padding: 20px;
+    margin-top: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    animation: fadeIn 0.5s ease;
+}
+
+.question { font-size: 20px; margin-bottom: 20px; }
+
+.options button {
+    display: block;
+    width: 100%;
+    margin: 10px 0;
+    padding: 12px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: #444466;
+    color: #fff;
+}
+.options button:hover { background: #555588; transform: scale(1.02); }
+.options button.correct { background: #28a745 !important; }
+.options button.wrong { background: #dc3545 !important; }
+
+#timer { margin-top: 10px; font-size: 18px; color: #ffcc00; }
+
+#score { font-size: 24px; margin-top: 20px; color: #00ffcc; }
+
+#progressBar {
+    width: 100%;
+    background: #333366;
+    border-radius: 8px;
+    margin-top: 20px;
+    height: 15px;
+    overflow: hidden;
+}
+#progress {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(to right, #28a745, #00ffcc);
+    transition: width 0.5s ease;
+    border-radius: 8px;
+}
+
+@keyframes fadeIn {
+    from {opacity: 0; transform: translateY(20px);}
+    to {opacity: 1; transform: translateY(0);}
+}
+</style>
+</head>
+<body>
+
+<div class="container" id="welcomeScreen">
+    <h1>Welcome to the Circle Quiz</h1>
+    <button class="button" id="startBtn">Start Quiz</button>
+</div>
+
+<div class="container hidden" id="quizScreen">
+    <div class="question-card">
+        <div id="timer">Time Left: 30s</div>
+        <div class="question" id="question"></div>
+        <div class="options" id="options"></div>
+        <div id="progressBar"><div id="progress"></div></div>
+    </div>
+</div>
+
+<div class="container hidden" id="resultScreen">
+    <h1>Quiz Completed!</h1>
+    <div id="score"></div>
+    <button class="button" id="restartBtn">Restart Quiz</button>
+</div>
+
+<audio id="correctSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
+<audio id="wrongSound" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
+
+<script>
+const quizData = [
+    { question: "What is USDC by Circle?", options: ["A decentralized exchange platform", "A leading digital dollar stablecoin", "A tokenized equity fund", "A blockchain development tool"], answer: 1 },
+    { question: "Which Circle product allows moving USDC between blockchains?", options: ["Arc", "CCTP", "Gateway", "Wallets"], answer: 1 },
+    { question: "What service does Circle’s Payments Network provide?", options: ["Real-time global settlement with financial institutions", "Automated smart contract deployment", "Tokenized funds issuance", "Blockchain security auditing"], answer: 0 },
+    { question: "Which Circle service allows embedding secure wallets in apps?", options: ["Paymaster", "Contracts", "Wallets", "Mint"], answer: 2 },
+    { question: "What is Circle’s Arc blockchain primarily used for?", options: ["Gaming and NFTs", "Stablecoin finance", "Social media applications", "Decentralized file storage"], answer: 1 }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let timeLeft = 30;
+let timer;
+
+const welcomeScreen = document.getElementById('welcomeScreen');
+const quizScreen = document.getElementById('quizScreen');
+const resultScreen = document.getElementById('resultScreen');
+const startBtn = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+const questionEl = document.getElementById('question');
+const optionsEl = document.getElementById('options');
+const scoreEl = document.getElementById('score');
+const timerEl = document.getElementById('timer');
+const progressEl = document.getElementById('progress');
+const correctSound = document.getElementById('correctSound');
+const wrongSound = document.getElementById('wrongSound');
+
+startBtn.addEventListener('click', () => {
+    welcomeScreen.classList.add('hidden');
+    quizScreen.classList.remove('hidden');
+    loadQuestion();
+});
+
+restartBtn.addEventListener('click', () => {
+    resultScreen.classList.add('hidden');
+    quizScreen.classList.remove('hidden');
+    currentQuestion = 0;
+    score = 0;
+    progressEl.style.width = '0%';
+    loadQuestion();
+});
+
+function startTimer() {
+    timeLeft = 30;
+    timerEl.textContent = `Time Left: ${timeLeft}s`;
+    timer = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = `Time Left: ${timeLeft}s`;
+        if(timeLeft <= 0) {
+            clearInterval(timer);
+            showCorrectAnswer();
+            setTimeout(nextQuestion, 1000);
+        }
+    }, 1000);
+}
+
+function loadQuestion() {
+    if(currentQuestion >= quizData.length) {
+        showResult();
+        return;
+    }
+    startTimer();
+    const q = quizData[currentQuestion];
+    questionEl.textContent = q.question;
+    optionsEl.innerHTML = '';
+    q.options.forEach((option, index) => {
+        const btn = document.createElement('button');
+        btn.textContent = option;
+        btn.addEventListener('click', () => selectAnswer(index));
+        optionsEl.appendChild(btn);
+    });
+    updateProgress();
+}
+
+function selectAnswer(selected) {
+    clearInterval(timer);
+    const correctIndex = quizData[currentQuestion].answer;
+    const buttons = optionsEl.querySelectorAll('button');
+
+    buttons.forEach((btn, index) => {
+        btn.disabled = true;
+        if(index === correctIndex) btn.classList.add('correct');
+        if(index === selected && selected !== correctIndex) btn.classList.add('wrong');
+    });
+
+    if(selected === correctIndex) {
+        score++;
+        correctSound.play();
+    } else {
+        wrongSound.play();
+    }
+
+    setTimeout(nextQuestion, 1000);
+}
+
+function showCorrectAnswer() {
+    const correctIndex = quizData[currentQuestion].answer;
